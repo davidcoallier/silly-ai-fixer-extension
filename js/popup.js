@@ -289,7 +289,8 @@ function convertToMarkdown(node) {
   // For simple content with just paragraphs, try a direct approach
   if (
     node.children.length > 0 &&
-    node.querySelectorAll("pre, code, ul, ol, table, blockquote").length === 0
+    node.querySelectorAll("p, hr, pre, code, ul, ol, table, blockquote")
+      .length === 0
   ) {
     console.log("Using simplified paragraph extraction");
     return Array.from(node.children)

@@ -1,11 +1,7 @@
 // Content script that adds the AI Fixer button to ChatGPT response actions
 
-// Create a simple SVG icon for the AI Fixer
-const fixerIconSvg = `
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-md-heavy">
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M20 5H4V19H20V5ZM4 3C2.89543 3 2 3.89543 2 5V19C2 20.1046 2.89543 21 4 21H20C21.1046 21 22 20.1046 22 19V5C22 3.89543 21.1046 3 20 3H4ZM9.5 8C9.5 7.44772 9.94772 7 10.5 7H16.5C17.0523 7 17.5 7.44772 17.5 8C17.5 8.55228 17.0523 9 16.5 9H10.5C9.94772 9 9.5 8.55228 9.5 8ZM6.5 8C6.5 8.55228 6.94772 9 7.5 9C8.05228 9 8.5 8.55228 8.5 8C8.5 7.44772 8.05228 7 7.5 7C6.94772 7 6.5 7.44772 6.5 8ZM9.5 12C9.5 11.4477 9.94772 11 10.5 11H16.5C17.0523 11 17.5 11.4477 17.5 12C17.5 12.5523 17.0523 13 16.5 13H10.5C9.94772 13 9.5 12.5523 9.5 12ZM6.5 12C6.5 12.5523 6.94772 13 7.5 13C8.05228 13 8.5 12.5523 8.5 12C8.5 11.4477 8.05228 11 7.5 11C6.94772 11 6.5 11.4477 6.5 12ZM9.5 16C9.5 15.4477 9.94772 15 10.5 15H16.5C17.0523 15 17.5 15.4477 17.5 16C17.5 16.5523 17.0523 17 16.5 17H10.5C9.94772 17 9.5 16.5523 9.5 16ZM6.5 16C6.5 16.5523 6.94772 17 7.5 17C8.05228 17 8.5 16.5523 8.5 16C8.5 15.4477 8.05228 15 7.5 15C6.94772 15 6.5 15.4477 6.5 16Z" fill="currentColor"/>
-</svg>
-`;
+// Use extension icon as the button icon
+const extensionIconUrl = chrome.runtime.getURL("icons/icon32.png");
 
 // Function to inject the button into the action bar
 function injectFixerButton() {
@@ -103,7 +99,16 @@ function injectFixerButton() {
     const buttonContent = document.createElement("span");
     buttonContent.className =
       "touch:w-[38px] flex h-[30px] w-[30px] items-center justify-center";
-    buttonContent.innerHTML = fixerIconSvg;
+
+    // Create img element for the icon
+    const iconImg = document.createElement("img");
+    iconImg.src = extensionIconUrl;
+    iconImg.alt = "AI Fixer";
+    iconImg.style.width = "20px";
+    iconImg.style.height = "20px";
+
+    // Add the icon to the button content
+    buttonContent.appendChild(iconImg);
 
     // Add button content to button
     newButton.appendChild(buttonContent);
@@ -282,10 +287,242 @@ function fixAIText(event) {
     stats.closeQuote +
     stats.ellipsis;
 
-  if (total > 0) {
-    showNotification(`Fixed ${total} characters`);
-  } else {
-    showNotification("No characters needed fixing");
+  // Convert the content to markdown
+  function convertToMarkdown(node) {
+    // Try a simple approach first for plain text content
+    if (node.textContent && node.children.length === 0) {
+      console.log("Using simple text extraction");
+      return node.textContent.trim();
+    }
+
+    // For simple content with just paragraphs, try a direct approach
+    if (
+      node.children.length > 0 &&
+      node.querySelectorAll("p, hr, pre, code, ul, ol, table, blockquote")
+        .length === 0
+    ) {
+      console.log("Using simplified paragraph extraction");
+      return Array.from(node.children)
+        .map((child) => child.textContent.trim())
+        .filter((text) => text.length > 0)
+        .join("\n\n");
+    }
+
+    console.log("Using full HTML to Markdown conversion");
+    // Get all the HTML content as a string
+    const htmlContent = node.innerHTML;
+
+    // Create a more robust markdown conversion
+    let markdown = "";
+
+    // Process the DOM tree to generate markdown
+    function processNode(node, listPrefix = "") {
+      if (!node) return "";
+
+      let result = "";
+
+      // Process based on node type
+      console.log(`Node name: ${node.nodeName}`);
+      switch (node.nodeName) {
+        case "H1":
+          return `# ${getTextContent(node)}\n\n`;
+        case "H2":
+          return `## ${getTextContent(node)}\n\n`;
+        case "H3":
+          return `### ${getTextContent(node)}\n\n`;
+        case "H4":
+          return `#### ${getTextContent(node)}\n\n`;
+        case "H5":
+          return `##### ${getTextContent(node)}\n\n`;
+        case "H6":
+          return `###### ${getTextContent(node)}\n\n`;
+        case "P":
+          return `${processChildNodes(node)}\n\n`;
+        case "BR":
+          return "\n";
+        case "UL":
+          return processListItems(node, "- ");
+        case "OL":
+          return processOrderedListItems(node);
+        case "LI":
+          // This should be handled by UL/OL processing
+          return `${listPrefix}${processChildNodes(node)}\n`;
+        case "BLOCKQUOTE":
+          // Process blockquote content with > prefix
+          const blockquoteContent = processChildNodes(node);
+          return (
+            blockquoteContent
+              .split("\n")
+              .map((line) => `> ${line}`)
+              .join("\n") + "\n\n"
+          );
+        case "PRE":
+          // Handle code blocks
+          const codeElement = node.querySelector("code");
+          if (codeElement) {
+            let language = "";
+            if (
+              codeElement.className &&
+              codeElement.className.includes("language-")
+            ) {
+              language = codeElement.className.replace(
+                /.*language-([^\s]+).*/,
+                "$1"
+              );
+            }
+            return (
+              "```" + language + "\n" + codeElement.textContent + "\n```\n\n"
+            );
+          } else {
+            return "```\n" + node.textContent + "\n```\n\n";
+          }
+        case "CODE":
+          // Handle inline code (not inside a PRE)
+          if (node.parentNode.nodeName !== "PRE") {
+            return "`" + node.textContent + "`";
+          }
+          return node.textContent;
+        case "STRONG":
+        case "B":
+          return `**${processChildNodes(node)}**`;
+        case "EM":
+        case "I":
+          return `*${processChildNodes(node)}*`;
+        case "A":
+          const href = node.getAttribute("href") || "#";
+          return `[${processChildNodes(node)}](${href})`;
+        case "IMG":
+          const src = node.getAttribute("src") || "";
+          const alt = node.getAttribute("alt") || "";
+          return `![${alt}](${src})`;
+        case "TABLE":
+          return processTable(node);
+        case "HR":
+          return "---\n\n";
+        case "DIV":
+          // For most divs, just process the content
+          return processChildNodes(node);
+        case "#text":
+          // Text node - just return the content
+          return node.textContent;
+        default:
+          // For other elements, process their children
+          return processChildNodes(node);
+      }
+    }
+
+    // Helper function to get text content without extra whitespace
+    function getTextContent(node) {
+      return node.textContent.trim().replace(/\s+/g, " ");
+    }
+
+    // Process child nodes and combine their results
+    function processChildNodes(node) {
+      let result = "";
+      for (const child of node.childNodes) {
+        result += processNode(child);
+      }
+      return result;
+    }
+
+    // Process unordered list items
+    function processListItems(ulNode, prefix) {
+      let result = "\n";
+      const items = ulNode.querySelectorAll(":scope > li");
+      for (const item of items) {
+        result += `${prefix}${processChildNodes(item)}\n`;
+      }
+      return result + "\n";
+    }
+
+    // Process ordered list items
+    function processOrderedListItems(olNode) {
+      let result = "\n";
+      const items = olNode.querySelectorAll(":scope > li");
+      let counter = olNode.getAttribute("start") || 1;
+      counter = parseInt(counter, 10);
+
+      for (const item of items) {
+        result += `${counter}. ${processChildNodes(item)}\n`;
+        counter++;
+      }
+      return result + "\n";
+    }
+
+    // Process tables
+    function processTable(tableNode) {
+      let result = "\n";
+      const rows = tableNode.querySelectorAll("tr");
+      let hasProcessedHeader = false;
+
+      for (const row of rows) {
+        const cells = row.querySelectorAll("th, td");
+        if (cells.length === 0) continue;
+
+        // Process cells into a row
+        const rowContent = Array.from(cells)
+          .map((cell) => {
+            return processChildNodes(cell).trim();
+          })
+          .join(" | ");
+
+        result += `| ${rowContent} |\n`;
+
+        // Add header separator after first row
+        if (!hasProcessedHeader) {
+          result +=
+            "| " +
+            Array.from(cells)
+              .map(() => "---")
+              .join(" | ") +
+            " |\n";
+          hasProcessedHeader = true;
+        }
+      }
+
+      return result + "\n";
+    }
+
+    // Start processing from the root node
+    markdown = processNode(node);
+
+    // Clean up extra line breaks
+    markdown = markdown.replace(/\n{3,}/g, "\n\n");
+
+    return markdown.trim();
+  }
+
+  // Convert the content to markdown
+  const markdown = convertToMarkdown(markdownDiv);
+
+  // Copy to clipboard
+  try {
+    navigator.clipboard
+      .writeText(markdown)
+      .then(() => {
+        if (total > 0) {
+          showNotification(`Fixed ${total} characters and copied to clipboard`);
+        } else {
+          showNotification("Content copied to clipboard");
+        }
+      })
+      .catch((err) => {
+        console.error("Clipboard write failed:", err);
+        if (total > 0) {
+          showNotification(
+            `Fixed ${total} characters but clipboard copy failed`
+          );
+        } else {
+          showNotification("No characters needed fixing");
+        }
+      });
+  } catch (error) {
+    console.error("Error copying to clipboard:", error);
+    if (total > 0) {
+      showNotification(`Fixed ${total} characters`);
+    } else {
+      showNotification("No characters needed fixing");
+    }
   }
 
   console.log("AI text fixed successfully", stats);

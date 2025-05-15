@@ -27,7 +27,10 @@ Strange question but understandable. Your asking if this is sending your data an
 
 ### Step 1: Download the Extension Files
 
-1. Download the extension files from the provided ZIP file or repository
+1. Download the extension files below ⬇️ from the provided ZIP file or from the git [repository](https://github.com/davidcoallier/silly-ai-fixer-extension)
+
+   []()
+
 2. Extract the files to a folder on your computer (remember the location)
 
 ### Step 2: Enable Developer Mode in Chrome
@@ -64,6 +67,11 @@ The extension is now installed! You should see the AI Text Fixer icon in your Ch
 5. You'll see statistics showing how many characters of each type were replaced
 6. Click "Copy Last Response to Clipboard" to extract the content as plain text with markdown formatting
 
+## Caveats
+
+- Once you’ve _fixed_ the text, you wno’t be able to just use the “Copy” ChatGPT button… that’s because ChatGPT is a React application and it has hooks which I’m not privy to.
+- There is a basic capability with “copy” which turns the new text into markdown and should work most of the time, but it might not.
+
 ## Troubleshooting
 
 - If the extension doesn't appear to be working, try refreshing the page
@@ -72,8 +80,10 @@ The extension is now installed! You should see the AI Text Fixer icon in your Ch
 - If you encounter any issues, try reinstalling the extension
 - If you’re not sure, then uninstall the extension and go on about your day ;)
 
-## About the Author
+## Whodat?
 
 AI Text Fixer was created to solve a common frustration when working with AI-generated text. If you find it useful, consider connecting with the author: [Follow David Coallier on LinkedIn](https://www.linkedin.com/in/davidcoallier)
+
+This was 90% vibe-coded so do what you gotta do with it.
 
 _AI Text Fixer is not affiliated with OpenAI or ChatGPT. This is an independent extension created to enhance the user experience._
